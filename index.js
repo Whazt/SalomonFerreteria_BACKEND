@@ -3,6 +3,8 @@
 require('dotenv').config(); // Load environment variables
 const express = require('express');
 const mysql = require('mysql2/promise'); // Use promise-based MySQL
+const axios = require('axios'); // Para consumir la API de Python
+const { exec } = require('child_process');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -31,16 +33,30 @@ app.get('/', (req, res) => {
 });
 
 // Route for fetching products
-app.get('/api/productos', async (req, res) => {
-    try {
-        const [rows] = await pool.query('SELECT * FROM Productos');
-        res.json(rows);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+app.get('/api/prediccion', (req, res) => {
+    exec('python ia/ventas_predict.py', (error, stdout, stderr) => {
+        // Manejo de errores
+        if (error) {
+            console.error(`Error al ejecutar Python: ${stderr}`);
+            console.error(`Código de error: ${error.code}`);
+            return res.status(500).json({ error: 'Error al generar informe' });
+        }
+
+        // Imprimir la salida del script para depuración
+        console.log(stdout); 
+
+        try {
+            const informe = JSON.parse(stdout);
+            res.json(informe);
+        } catch (parseError) {
+            console.error(`Error al analizar JSON: ${parseError.message}`);
+            return res.status(500).json({ error: 'Error al procesar la respuesta' });
+        }
+    });
 });
+
 
 // Start the server
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });
